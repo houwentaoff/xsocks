@@ -4,6 +4,7 @@
 #include "Tunnel.h"
 #include "th3rd/dns.h"
 #include "socks/SocksMgr.h"
+#include "client/client.h"
 
 using namespace std;
 
@@ -57,6 +58,15 @@ void LoadCommand(int argc, _TCHAR* argv[] ,CMD_MAP& map)
 			}
 		}
 	}
+}
+void * clientmain(void *pa)
+{
+    int port = (int)pa;
+    sleep(2);
+    SocksClint socks = SocksClint();
+    socks.Begin("127.0.0.1", port);
+    
+    return NULL;
 }
 
 #ifdef LINUX
@@ -183,6 +193,10 @@ int _tmain(int argc, _TCHAR* argv[])
 			int port = atoi(t2a(it->second.c_str()));
 
 			Version();
+            
+            Thread t;
+			t.Start((LPTHREAD_START_ROUTINE)clientmain, port);
+            
 			CSocksMgr::GetInstanceRef().Begin(port);
 			ret = TRUE;
 			break;

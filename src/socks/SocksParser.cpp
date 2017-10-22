@@ -1,17 +1,14 @@
 ﻿#include "stdafx.h"
 #include "SocksParser.h"
 
-static int m_socket = 1020;
+int SocksParser::m_socket = 1024;
 
-#ifdef LINUX
-#define MAKEWORD(a, b) ((WORD)(((BYTE)(((DWORD_PTR)(a)) & 0xff)) | ((WORD)((BYTE)(((DWORD_PTR)(b)) & 0xff))) << 8))
-#define MAKELONG(a, b) ((LONG)(((WORD)(a)) | ((DWORD)((WORD)(b))) << 16))
-#else
-#endif
+
+DNS_MAP SocksParser::m_dns = DNS_MAP();
 
 SocksParser::SocksParser()
 {
-
+    //m_dns.insert(std::make_pair("a", "ad")); 
 }
 SocksParser::~SocksParser()
 {
@@ -20,6 +17,8 @@ SocksParser::~SocksParser()
 
 bool SocksParser::GetRequest( SERVICE_INFO& svc )
 {
+    /* cli --> srv  request*/
+    /* ATYP(0x1:ipv4 0x3:DOMAINNAME 0x4: ipv6) */
 	/*
 	 +----+-----+-------+------+----------+----------+
 	  |VER | CMD |  RSV  | ATYP | DST.ADDR | DST.gListenSocket |
@@ -27,12 +26,14 @@ bool SocksParser::GetRequest( SERVICE_INFO& svc )
 	  | 1  |  1  | X'00' |  1   | Variable |    2     |
 	  +----+-----+-------+------+----------+----------+
 	*/
-	char buffer[1024];
+	char buffer[1024]={0x5, 0x03, 0xf, 0x1,};
 	sockaddr_in svr = {0};
-
+#if 1 // 使用TCP接收UDP穿透请求 
 	if(!RecvBuf(svc.socket,buffer,10))
 		return FALSE;
+#else
 
+#endif
 	switch (buffer[1])
 	{
 		case 0x01:
@@ -41,7 +42,7 @@ bool SocksParser::GetRequest( SERVICE_INFO& svc )
 		case 0x02:
 			svc.type = SOCKS_BIND;
 			break;
-		case 0x03:
+		case 0x03://UDP 穿透请求
 			svc.type = SOCKS_UDP;
 			break;
 	}
@@ -49,6 +50,16 @@ bool SocksParser::GetRequest( SERVICE_INFO& svc )
 	//需要连接一个IP
 	if (buffer[3] == 0x01)
 	{
+#if 1 //joy
+        //buffer[4] = 192;
+        //buffer[5] = 168;
+        //buffer[6] = 27;
+        //buffer[7] = 101;
+        
+        //buffer[8] = 0x6; 
+        //buffer[9] = 0x90;
+#else
+#endif
 		infoLog(_T("THE DESTINATION IP : %d.%d.%d.%d "),\
 			buffer[4]&0xff,buffer[5]&0xff,buffer[6]&0xff,buffer[7]&0xff) ;
 
@@ -59,6 +70,7 @@ bool SocksParser::GetRequest( SERVICE_INFO& svc )
 		svr.sin_addr.s_addr =
 			MAKELONG(MAKEWORD((buffer[4]&0xff),(buffer[5]&0xff)),
 			MAKEWORD((buffer[6]&0xff),(buffer[7]&0xff))) ;
+
 	}
 
 		//需要连接一个域名
@@ -109,6 +121,8 @@ bool SocksParser::GetRequest( SERVICE_INFO& svc )
 
 	if (svc.type == SOCKS_UDP)
 	{
+        //udp 穿透请求
+        printf("udp穿透 req\n");
 		svc.caddr = svr;
 
 		sockaddr_in addr;
@@ -118,7 +132,6 @@ bool SocksParser::GetRequest( SERVICE_INFO& svc )
 
 		getpeername(svc.socket,(sockaddr*)&addr,&size);
 		svc.caddr.sin_addr = addr.sin_addr;
-
 	}
 	else if (svc.type == SOCKS_CONNECT)
 	{
@@ -155,6 +168,7 @@ bool SocksParser::TCPResponse( SERVICE_INFO& svc )
 		GetHostIP(buffer+4);
 		m_socket++;
 		svc.sq = m_socket;
+		infoLog(_T("proxy dispatch port :%d"), svc.sq);
 		buffer[8] = svc.sq/256;
 		buffer[9] = svc.sq%256;
 
@@ -182,6 +196,18 @@ bool SocksParser::TCPResponse( SERVICE_INFO& svc )
 				}
 				break;
 			}
+            if (svc.type == SOCKS_UDP)
+            {
+#if 1 //joy
+                //svc.sq = 8085;
+        
+                if (!Socket::Bind(svc.usocket, svc.sq, svc.saddr))
+                {
+                    printf("server usocket[%d] binding udp port[%d] fail!\n", svc.usocket, svc.sq);
+                    return FALSE;
+                }
+#endif
+            }
 
 			ret = TRUE;
 
@@ -206,27 +232,46 @@ bool SocksParser::UDPResponse( SERVICE_INFO& svc )
 
 	socklen_t nSockSize = sizeof(SourceAddr);
 	int nStartPos = 0;
+#if 1 //joy
+    char buffer[10+1024*4]={0};
+#else
 	char buffer[1024*4];
-
-	int nCount = recvfrom(svc.usocket,buffer,1024*4,0,(sockaddr*)&SourceAddr,&nSockSize);
-
+#endif
+    printf("==>%s line[%d] \n", __func__, __LINE__);
+#if 0
+	int nCount = recvfrom(svc.usocket, &buffer[10], 1024*4,0,(sockaddr*)&SourceAddr,&nSockSize);
+#else
+    int nCount = recvfrom(svc.usocket,buffer,1024*4,0,(sockaddr*)&SourceAddr,&nSockSize);
+#endif
+    printf("==>%s recvfrom \n", __func__);
 	if (nCount == SOCKET_ERROR)
 	{
 		debugLog(_T("Recvfrom() Error!"));
 		return FALSE;
 	}
-
-	buffer[nCount] = 0;
-
+#if 0 //joy
+	buffer[10+nCount] = 0;
+#else
+    buffer[nCount] = 0;
+#endif
 	//通过端口判断来源
-	if (SourceAddr.sin_port == svc.caddr.sin_port)
+    printf("src port[%d] caddr.port[%d]\n", ntohs(SourceAddr.sin_port), ntohs(svc.caddr.sin_port));
+	if ( SourceAddr.sin_port == svc.caddr.sin_port )
 	{
-		int nAType = buffer[3];
+		int nAType = 0x1;//joy buffer[3];
 		infoLog(_T("The address type : %d " ),nAType);
 
 		if (nAType == 0x01)
 		{
-			infoLog(_T("The disire socket : %d.%d.%d.%d"),buffer[4]&0xff,buffer[5]&0xff,buffer[6]&0xff , buffer[7]&0xff);
+#if 0 //joy
+            buffer[4] = 192;
+            buffer[5] = 168;
+            buffer[6] = 27;
+            buffer[7] = 101;
+            buffer[8] = 0x6; 
+            buffer[9] = 0x90;
+#endif
+            infoLog(_T("The disire socket : %d.%d.%d.%d"),buffer[4]&0xff,buffer[5]&0xff,buffer[6]&0xff , buffer[7]&0xff);
 
 			desireAddr.sin_addr.s_addr =MAKELONG(MAKEWORD((buffer[4]&0xff),(buffer[5]&0xff)),
 				MAKEWORD((buffer[6]&0xff),(buffer[7]&0xff)));;
@@ -266,7 +311,10 @@ bool SocksParser::UDPResponse( SERVICE_INFO& svc )
 		{
 			//ipv6 not implement:)
 		}
+        #if 0  //joy
+        #else
 		nCount -= nStartPos;
+        #endif
 		sendto(svc.usocket,buffer+nStartPos,nCount,0,(sockaddr*)&desireAddr,sizeof(desireAddr));
 	}
 	else
@@ -278,7 +326,7 @@ bool SocksParser::UDPResponse( SERVICE_INFO& svc )
 		if (m_dns.find(std::string(inet_ntoa(SourceAddr.sin_addr))) == m_dns.end())
 		{
 			reply[0] = reply[1] = reply[2] = 0;
-			reply[3] = 0x01;
+			reply[3] = 0x01;//IP V4 address: X'01'
 			memcpy(reply+4,(void*)&SourceAddr.sin_addr.s_addr,4);
 
 			reply[8] = ntohs(SourceAddr.sin_port)/256;
@@ -290,7 +338,7 @@ bool SocksParser::UDPResponse( SERVICE_INFO& svc )
 		else
 		{
 			reply[0] = reply[1] = reply[2] = 0;
-			reply[3] = 0x03;
+			reply[3] = 0x03;// DOMAINNAME: X'03'
 			std::string strDomainName = m_dns[std::string(inet_ntoa(SourceAddr.sin_addr))];
 			infoLog(_T("The domain name : %s"), strDomainName.c_str() );
 

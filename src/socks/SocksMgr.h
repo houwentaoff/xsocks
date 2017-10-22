@@ -44,6 +44,9 @@ private:
 	static DWORD WINAPI TCPTunnel( LPVOID lpParameter );
 	DWORD WINAPI TCPTunnelProc( LPVOID lpParameter );
 
+	static DWORD WINAPI UDPTunnel( LPVOID lpParameter );
+	DWORD WINAPI UDPTunnelProc( LPVOID lpParameter );
+
 	static DWORD WINAPI Reverse(void* lpParameter);
 	DWORD WINAPI ReverseProc(void* lpParameter);
 

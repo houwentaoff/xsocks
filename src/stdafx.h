@@ -10,7 +10,7 @@
 	#define FALSE false
 
 	typedef char* LPSTR;
-	typedef bool bool;
+    typedef bool BOOL;
 	typedef void* LPVOID;
 	typedef const char* LPCSTR;
 	typedef const char* LPCTSTR;
@@ -21,7 +21,7 @@
 	typedef unsigned short WORD;
 	typedef unsigned char BYTE;
 	typedef unsigned long DWORD_PTR;
-	typedef int int;
+//	typedef int int;
 
 	typedef void* (*LPTHREAD_START_ROUTINE)(void*);
 
@@ -39,6 +39,11 @@
 	#include <time.h>
 	#include <stdlib.h>
 	#include <wait.h>
+#ifdef LINUX
+#define MAKEWORD(a, b) ((WORD)(((BYTE)(((DWORD_PTR)(a)) & 0xff)) | ((WORD)((BYTE)(((DWORD_PTR)(b)) & 0xff))) << 8))
+#define MAKELONG(a, b) ((LONG)(((WORD)(a)) | ((DWORD)((WORD)(b))) << 16))
+#else
+#endif
 
 #else
 
