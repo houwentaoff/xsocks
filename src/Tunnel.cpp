@@ -64,7 +64,7 @@ bool CTunnel::WaitTunnel()
 
     if (m_sMgr != SOCKET_ERROR)
     {
-        t.Start((LPTHREAD_START_ROUTINE)CheckMgr,this);
+        t.Start((LPTHREAD_START_ROUTINE)CheckMgr, this);
     }
 
     return m_sMgr != SOCKET_ERROR;
@@ -103,7 +103,7 @@ DWORD WINAPI CTunnel::TunnelProc()
         pTransInfo->s2 = config.s;
         pTransInfo->lpParameter = this;
 
-        t.Start((LPTHREAD_START_ROUTINE)TCPTunnel,pTransInfo);
+        t.Start((LPTHREAD_START_ROUTINE)TCPTunnel, pTransInfo);
 
     }
 
@@ -126,7 +126,7 @@ DWORD WINAPI CTunnel::WorkerProc()
     {
         s = Accept(m_s2,(sockaddr*)&svr);
 
-        infoLog(_T("Accept : %s"),a2t(inet_ntoa(svr.sin_addr)));
+        infoLog(_T("[Svr] Accept : %s"),a2t(inet_ntoa(svr.sin_addr)));
 
         if (s <= 0)
             break;
@@ -155,13 +155,13 @@ DWORD WINAPI CTunnel::TCP_S2C(LPVOID lpParameter)
 
     while (TRUE)
     {
-        nCount = recv(pInfo->s2,buffer,1024*4,0);
+        nCount = recv(pInfo->s2, buffer, 1024*4, 0);
         if (nCount == SOCKET_ERROR)
         {
             debugLog(_T("recv Error! %d"),WSAGetLastError());
             break;
         }
-        if(!Socket::SendBuf(pInfo->s1,buffer,nCount))
+        if(!Socket::SendBuf(pInfo->s1, buffer, nCount))
         {
             debugLog(_T("send Error! %d"),WSAGetLastError());
             break;
@@ -180,13 +180,13 @@ DWORD WINAPI CTunnel::TCP_C2S(void* lpParameter)
 
     while (TRUE)
     {
-        nCount = recv(pInfo->s1,buffer,1024*4,0);
+        nCount = recv(pInfo->s1, buffer, 1024*4,0);
         if (nCount == SOCKET_ERROR)
         {
             debugLog(_T("recv Error! %d"),WSAGetLastError());
             break;
         }
-        if(!Socket::SendBuf(pInfo->s2,buffer,nCount))
+        if(!Socket::SendBuf(pInfo->s2, buffer, nCount))
         {
             debugLog(_T("send Error! %d"),WSAGetLastError());
             break;
@@ -208,7 +208,7 @@ DWORD WINAPI CTunnel::TCPTunnelProc( LPVOID lpParameter )
 
     Thread t1 , t2;
 
-    t1.Start((LPTHREAD_START_ROUTINE)TCP_C2S,pTransInfo);
+    t1.Start((LPTHREAD_START_ROUTINE)TCP_C2S, pTransInfo);
     t2.Start((LPTHREAD_START_ROUTINE)TCP_S2C, pTransInfo);
 
     t1.WaitForEnd();
@@ -228,26 +228,26 @@ DWORD WINAPI CTunnel::TCPTunnelProc( LPVOID lpParameter )
 
 bool CTunnel::Begin(int port1,int port2)
 {
-    infoLog(_T("Bind ports %d and %d..."),port1,port2);
+    infoLog(_T("[Svr] Bind ports %d and %d..."), port1, port2);
 
-    bool ret = BindTunnel(port1,port2) && WaitTunnel();
+    bool ret = BindTunnel(port1, port2) && WaitTunnel();
     
     if ( !ret )
     {
-        errorLog(_T("Bind faild!"));
+        errorLog(_T("[Svr] Bind faild!"));
         return ret;
     }
-    infoLog(_T("Listening..."));
+    infoLog(_T("[Svr] Listening..."));
 
     Thread t1 ,t2;
 
-    t1.Start((LPTHREAD_START_ROUTINE)Tunnel,this);
-    t2.Start((LPTHREAD_START_ROUTINE)Worker,this);
+    t1.Start((LPTHREAD_START_ROUTINE)Tunnel, this);
+    t2.Start((LPTHREAD_START_ROUTINE)Worker, this);
 
     t1.WaitForEnd();
     t2.WaitForEnd();
 
-    infoLog(_T("DISCONNECT!"));
+    infoLog(_T("[Svr] DISCONNECT!"));
 
     return ret;
 }

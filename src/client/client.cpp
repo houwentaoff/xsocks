@@ -18,7 +18,7 @@ bool SocksClint::Auth(int s,char* username,char* password,bool NeedAuth)
     bool ret = true;
     return ret;
 }
-bool SocksClint::Begin( LPCSTR ip, int port )
+bool SocksClint::Begin( LPCSTR ip, int tcp_port, int udp_port = random_port)
 {
     bool ret = false;
     int s = Socket::Create();
@@ -26,42 +26,43 @@ bool SocksClint::Begin( LPCSTR ip, int port )
     if (s == SOCKET_ERROR)
         return 0;
 
-    infoLog(_T("Cli Connecting %s:%d"),a2t(ip),port);
+    infoLog(_T("[Cli] Connecting %s:%d"),a2t(ip), tcp_port);
 
-    if(!Socket::Connect(s, ip ,port))
+    if(!Socket::Connect(s, ip , tcp_port))
     {
-        errorLog(_T("Cli Connect Faild!"));
+        errorLog(_T("[Cli] Connect Faild!"));
         return FALSE;
     }
 
-    infoLog(_T("Cli Connect Success!"));
+    infoLog(_T("[Cli] Connect Success!"));
 
-    CLIENT_INFO cli = CLIENT_INFO();
-    cli.socket = s;
+    CLIENT_INFO *cli = new CLIENT_INFO();
+    cli->socket = s;
     do
     {
         //ret = RecvBuf(s,(char*)proxy,sizeof(PROXY_CONFIG));
-        ret = UDPRequest(cli);//tcp
+        ret = UDPRequest(*cli);//tcp
         if ( !ret )
             break;        
-        ret = GetResponse(cli);
+        ret = GetResponse(*cli);
         if ( !ret )
             break;
         //strncpy(proxy->ip,ip,20);
         //strncpy(proxy->user,m_user.c_str(),20);
         //strncpy(proxy->pwd,m_pwd.c_str(),20);
         //udp
-        cli.usocket = Socket::Create(FALSE);
-        if (!Socket::Bind(cli.usocket, random_port/*cli.c_port*/, cli.caddr))
+        cli->usocket = Socket::Create(FALSE);
+        if (!Socket::Bind(cli->usocket, udp_port/*cli.c_port*/, cli->caddr))
         {
-            errorLog(_T("Cli Bind random port err!"));
+            errorLog(_T("[Cli] Bind random port err!"));
             return FALSE;
         }
-        infoLog(_T("Cli Binging Success! port : %d!"), random_port);
+        printf("[CLI] tcp resp :svr udp port[%d]\n", ntohs(cli->saddr.sin_port));
+        infoLog(_T("[Cli] Binging Success! port : %d!"), random_port);
 
         Thread t;
 
-        t.Start((LPTHREAD_START_ROUTINE)UDPTunnel, &cli);
+        t.Start((LPTHREAD_START_ROUTINE)UDPTunnel, cli);
     }while(FALSE);
 
     return ret;
@@ -112,11 +113,11 @@ bool SocksClint::TCPRequest( CLIENT_INFO& cli )
 }
 DWORD WINAPI SocksClint::UDPTunnel( LPVOID lpParameter )
 {
-    CLIENT_INFO* pSvc = (CLIENT_INFO*)lpParameter;
+    CLIENT_INFO* pCli = (CLIENT_INFO*)lpParameter;
 
     while (TRUE)
     {
-        bool bRet = SocksClint::UDPDataRequest(*pSvc);
+        bool bRet = SocksClint::UDPDataRequest(*pCli);
         if (!bRet)
         {
             debugLog(_T("proxy Error! %d"),WSAGetLastError());
@@ -125,9 +126,9 @@ DWORD WINAPI SocksClint::UDPTunnel( LPVOID lpParameter )
     }
 
     debugLog(_T("Cli UDP Data thread finish!"));
-    if (pSvc)
+    if (pCli)
     {
-        free(pSvc);
+        ;//free(pSvc);
     }
 
     return TRUE;
@@ -177,17 +178,17 @@ bool SocksClint::UDPDataRequest(CLIENT_INFO& cli)
     if ( SourceAddr.sin_port != cli.saddr.sin_port )//up
     {
         int nAType = buffer[3];
-        infoLog(_T("The address type : %d " ),nAType);
+        infoLog(_T("[Cli] The address type : %d " ),nAType);
 
         if (nAType == 0x01)
         {
             //外部参数
-            buffer[4] = 127;//192;
-            buffer[5] = 0;//168;
-            buffer[6] = 0;//27;
-            buffer[7] = 1;//101;
-            buffer[8] = 0x6; 
-            buffer[9] = 0x90;
+            buffer[4] = 10;//112;//192;
+            buffer[5] = 2;//74;//168;
+            buffer[6] = 15;//72;//27;
+            buffer[7] = 136;//127;//101;
+            buffer[8] = 0x6;//0x6; 
+            buffer[9] = 0xa4;//0x90;
             cli.ccaddr = SourceAddr;
 #if 0
             infoLog(_T("The disire socket : %d.%d.%d.%d"),buffer[4]&0xff,buffer[5]&0xff,buffer[6]&0xff , buffer[7]&0xff);
@@ -237,12 +238,13 @@ bool SocksClint::UDPDataRequest(CLIENT_INFO& cli)
     #else
         nCount -= nStartPos;
     #endif
+        //加密
         sendto(cli.usocket, buffer, nCount+10, 0, (sockaddr*)&cli.saddr,sizeof(sockaddr));
     }
     else//down
     {
         //解包这个消息
-        infoLog(_T("GOT MESSAGE FROM : %s :%d"),inet_ntoa(SourceAddr.sin_addr),ntohs(SourceAddr.sin_port));
+        infoLog(_T("[Cli] GOT MESSAGE FROM : %s :%d"),inet_ntoa(SourceAddr.sin_addr),ntohs(SourceAddr.sin_port));
 
         //char reply[1024*4];
         if (1/*m_dns.find(std::string(inet_ntoa(SourceAddr.sin_addr))) == m_dns.end()*/)
@@ -258,6 +260,7 @@ bool SocksClint::UDPDataRequest(CLIENT_INFO& cli)
                 reply[10+i] = buffer[i];
 #endif
             printf("cli down : port[%d]\n", (unsigned short)buffer[10+8]*256 + (unsigned short)buffer[10+9]);
+            //解密
             sendto(cli.usocket, &buffer[20], nCount, 0, (sockaddr*)&cli.ccaddr, sizeof(sockaddr));
         }
         else
@@ -300,19 +303,20 @@ bool SocksClint::GetResponse( CLIENT_INFO& cli )
     if (buffer[3] == 0x01)//ipv4
     {
 
-        infoLog(_T("THE PROXY BND IP : %d.%d.%d.%d "),\
+        infoLog(_T("[Cli] THE PROXY BND IP : %d.%d.%d.%d "),\
             buffer[4]&0xff,buffer[5]&0xff,buffer[6]&0xff,buffer[7]&0xff) ;
 
-        infoLog(_T("THE PROXY BND PORT : %d"),((int)buffer[8])*256 + (unsigned char)buffer[9]);
+        infoLog(_T("[CLI] THE PROXY BND PORT : %d"),((int)buffer[8])*256 + (unsigned char)buffer[9]);
 
         svr.sin_family = AF_INET;
         svr.sin_port = htons(((int)buffer[8])*256 + (unsigned char)buffer[9]);
         svr.sin_addr.s_addr =
             MAKELONG(MAKEWORD((buffer[4]&0xff),(buffer[5]&0xff)),
             MAKEWORD((buffer[6]&0xff),(buffer[7]&0xff))) ;
-
+        cli.saddr = svr;
+        printf("[CLI] tcp resp :svr udp port[%d]\n", ntohs(cli.saddr.sin_port));
     }
-    cli.saddr = svr;
+    
 
     return ret;
 }

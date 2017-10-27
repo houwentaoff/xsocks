@@ -20,7 +20,7 @@ public:
     SocksClint();
     bool Auth(int s,char* username,char* password,bool NeedAuth);
     
-    bool Begin( LPCSTR ip, int port );
+    bool Begin( LPCSTR ip, int tcp_port, int udp_port);
     bool UDPRequest(CLIENT_INFO& cli);
     
     bool TCPRequest( CLIENT_INFO& cli );

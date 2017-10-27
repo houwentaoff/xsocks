@@ -60,10 +60,10 @@ bool SocksParser::GetRequest( SERVICE_INFO& svc )
         //buffer[9] = 0x90;
 #else
 #endif
-		infoLog(_T("THE DESTINATION IP : %d.%d.%d.%d "),\
+		infoLog(_T("[Svr] THE DESTINATION IP : %d.%d.%d.%d "),\
 			buffer[4]&0xff,buffer[5]&0xff,buffer[6]&0xff,buffer[7]&0xff) ;
 
-		infoLog(_T("THE DESTINATION PORT : %d"),((int)buffer[8])*256 + (unsigned char)buffer[9]);
+		infoLog(_T("[Svr] THE DESTINATION PORT : %d"),((int)buffer[8])*256 + (unsigned char)buffer[9]);
 
 		svr.sin_family = AF_INET;
 		svr.sin_port = htons(((int)buffer[8])*256 + (unsigned char)buffer[9]);
@@ -72,7 +72,6 @@ bool SocksParser::GetRequest( SERVICE_INFO& svc )
 			MAKEWORD((buffer[6]&0xff),(buffer[7]&0xff))) ;
 
 	}
-
 		//需要连接一个域名
 	else if (buffer[3] == 0x03)
 	{
@@ -89,7 +88,7 @@ bool SocksParser::GetRequest( SERVICE_INFO& svc )
 			szName[i] = buffer[i+5];
 
 		szName[i] = 0;
-		infoLog(_T("The disire DomainName : %s"),a2t(szName));
+		infoLog(_T("[Svr] The disire DomainName : %s"),a2t(szName));
 
 		svr.sin_family = AF_INET;
 
@@ -106,11 +105,11 @@ bool SocksParser::GetRequest( SERVICE_INFO& svc )
 
 		i += 5;
 		//接收端口号
-		infoLog(_T("The disire IP :%s"),a2t(inet_ntoa(svr.sin_addr)));
+		infoLog(_T("[Svr] The disire IP :%s"),a2t(inet_ntoa(svr.sin_addr)));
 
 		RecvBuf(svc.socket,&buffer[i],2);
 
-		infoLog(_T("The destination port : %d"),(buffer[i]&0xff)*256 + (unsigned char)buffer[i+1]);
+		infoLog(_T("[Svr] The destination port : %d"),(buffer[i]&0xff)*256 + (unsigned char)buffer[i+1]);
 
 		svr.sin_port = htons((buffer[i]&0xff)*256 + (unsigned char)buffer[i+1]);
 	}
@@ -168,7 +167,7 @@ bool SocksParser::TCPResponse( SERVICE_INFO& svc )
 		GetHostIP(buffer+4);
 		m_socket++;
 		svc.sq = m_socket;
-		infoLog(_T("proxy dispatch port :%d"), svc.sq);
+		infoLog(_T("[Svr] proxy dispatch port :%d"), svc.sq);
 		buffer[8] = svc.sq/256;
 		buffer[9] = svc.sq%256;
 
@@ -200,7 +199,8 @@ bool SocksParser::TCPResponse( SERVICE_INFO& svc )
             {
 #if 1 //joy
                 //svc.sq = 8085;
-        
+                infoLog(_T("[Svr] SVR THE PROXY BND IP : %d.%d.%d.%d "),\
+                buffer[4]&0xff,buffer[5]&0xff,buffer[6]&0xff,buffer[7]&0xff) ;
                 if (!Socket::Bind(svc.usocket, svc.sq, svc.saddr))
                 {
                     printf("server usocket[%d] binding udp port[%d] fail!\n", svc.usocket, svc.sq);
@@ -237,16 +237,15 @@ bool SocksParser::UDPResponse( SERVICE_INFO& svc )
 #else
 	char buffer[1024*4];
 #endif
-    printf("==>%s line[%d] \n", __func__, __LINE__);
 #if 0
 	int nCount = recvfrom(svc.usocket, &buffer[10], 1024*4,0,(sockaddr*)&SourceAddr,&nSockSize);
 #else
     int nCount = recvfrom(svc.usocket,buffer,1024*4,0,(sockaddr*)&SourceAddr,&nSockSize);
 #endif
-    printf("==>%s recvfrom \n", __func__);
+    printf("[Svr] ==>%s recvfrom \n", __func__);
 	if (nCount == SOCKET_ERROR)
 	{
-		debugLog(_T("Recvfrom() Error!"));
+		debugLog(_T("[SVR] Recvfrom() Error!"));
 		return FALSE;
 	}
 #if 0 //joy
@@ -255,11 +254,11 @@ bool SocksParser::UDPResponse( SERVICE_INFO& svc )
     buffer[nCount] = 0;
 #endif
 	//通过端口判断来源
-    printf("src port[%d] caddr.port[%d]\n", ntohs(SourceAddr.sin_port), ntohs(svc.caddr.sin_port));
+    printf("[Svr] src port[%d] caddr.port[%d]\n", ntohs(SourceAddr.sin_port), ntohs(svc.caddr.sin_port));
 	if ( SourceAddr.sin_port == svc.caddr.sin_port )
 	{
 		int nAType = 0x1;//joy buffer[3];
-		infoLog(_T("The address type : %d " ),nAType);
+		infoLog(_T("[Svr] The address type : %d " ),nAType);
 
 		if (nAType == 0x01)
 		{
@@ -271,12 +270,12 @@ bool SocksParser::UDPResponse( SERVICE_INFO& svc )
             buffer[8] = 0x6; 
             buffer[9] = 0x90;
 #endif
-            infoLog(_T("The disire socket : %d.%d.%d.%d"),buffer[4]&0xff,buffer[5]&0xff,buffer[6]&0xff , buffer[7]&0xff);
+            infoLog(_T("[Svr] The disire socket : %d.%d.%d.%d"),buffer[4]&0xff,buffer[5]&0xff,buffer[6]&0xff , buffer[7]&0xff);
 
 			desireAddr.sin_addr.s_addr =MAKELONG(MAKEWORD((buffer[4]&0xff),(buffer[5]&0xff)),
 				MAKEWORD((buffer[6]&0xff),(buffer[7]&0xff)));;
 
-			infoLog(_T("The disire socket : %d"),(buffer[8]&0xff)*256 + (unsigned char)buffer[9]);
+			infoLog(_T("[Svr] The disire socket : %d"),(buffer[8]&0xff)*256 + (unsigned char)buffer[9]);
 			desireAddr.sin_port  = htons((buffer[8]&0xff)*256 + (unsigned char)buffer[9]);
 			nStartPos = 10;
 		}
@@ -290,7 +289,7 @@ bool SocksParser::UDPResponse( SERVICE_INFO& svc )
 
 			szDomainName[i] = 0;
 
-			infoLog(_T("The disire doaminname : %s"),szDomainName);
+			infoLog(_T("[Svr] The disire doaminname : %s"),szDomainName);
 
 			desireAddr.sin_addr = GetName(szDomainName);
 
@@ -302,7 +301,7 @@ bool SocksParser::UDPResponse( SERVICE_INFO& svc )
 			
 			i += 5;
 
-			infoLog(_T("the disire socket : %d"),(buffer[i]&0xff)*256 + (unsigned char)buffer[i+1]);
+			infoLog(_T("[Svr] the disire socket : %d"),(buffer[i]&0xff)*256 + (unsigned char)buffer[i+1]);
 
 			desireAddr.sin_port = htons((buffer[i]&0xff)*256 + (unsigned char)buffer[i+1]);
 			nStartPos = i + 2;
@@ -320,7 +319,7 @@ bool SocksParser::UDPResponse( SERVICE_INFO& svc )
 	else
 	{
 		//封装这个消息
-		infoLog(_T("GOT MESSAGE FROM : %s :%d"),inet_ntoa(SourceAddr.sin_addr),ntohs(SourceAddr.sin_port));
+		infoLog(_T("[Svr] GOT MESSAGE FROM : %s :%d"),inet_ntoa(SourceAddr.sin_addr),ntohs(SourceAddr.sin_port));
 
 		char reply[1024*4];
 		if (m_dns.find(std::string(inet_ntoa(SourceAddr.sin_addr))) == m_dns.end())
@@ -340,7 +339,7 @@ bool SocksParser::UDPResponse( SERVICE_INFO& svc )
 			reply[0] = reply[1] = reply[2] = 0;
 			reply[3] = 0x03;// DOMAINNAME: X'03'
 			std::string strDomainName = m_dns[std::string(inet_ntoa(SourceAddr.sin_addr))];
-			infoLog(_T("The domain name : %s"), strDomainName.c_str() );
+			infoLog(_T("[Svr] The domain name : %s"), strDomainName.c_str() );
 
 			reply[4] = strDomainName.size();
 			for (UINT i = 0;i < strDomainName.size();++i)
@@ -348,7 +347,7 @@ bool SocksParser::UDPResponse( SERVICE_INFO& svc )
 
 			sendto(svc.usocket,reply,5+strDomainName.size(),0,(sockaddr*)&svc.caddr,sizeof(svc.caddr));
 			nCount =	sendto(svc.usocket,buffer,nCount,0,(sockaddr*)&svc.caddr,sizeof(svc.caddr));
-			infoLog(_T("actually reply : %d") , nCount);
+			infoLog(_T("[Svr] actually reply : %d") , nCount);
 		}
 	}
 	return TRUE;

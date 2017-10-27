@@ -311,15 +311,15 @@ bool CSocksMgr::Begin( LPCSTR ip1, int port1,LPCSTR ip2,int port2)
     if (s == SOCKET_ERROR)
         return 0;
 
-    infoLog(_T("Connecting %s:%d"),a2t(ip1),port1);
+    infoLog(_T("[Svr] Connecting %s:%d"),a2t(ip1),port1);
 
     if(!Socket::Connect(s,ip1,port1))
     {
-        errorLog(_T("Connect Faild!"));
+        errorLog(_T("[Svr] Connect Faild!"));
         return FALSE;
     }
 
-    infoLog(_T("Connect Success!"));
+    infoLog(_T("[Svr] Connect Success!"));
 
 
     bool ret = FALSE;
@@ -357,15 +357,15 @@ bool CSocksMgr::Begin( LPCSTR ip, int port )
     if (s == SOCKET_ERROR)
         return 0;
 
-    infoLog(_T("Connecting %s:%d"),a2t(ip),port);
+    infoLog(_T("[Svr] Connecting %s:%d"),a2t(ip),port);
 
     if(!Socket::Connect(s,ip,port))
     {
-        errorLog(_T("Connect Faild!"));
+        errorLog(_T("[Svr] Connect Faild!"));
         return FALSE;
     }
 
-    infoLog(_T("Connect Success!"));
+    infoLog(_T("[Svr] Connect Success!"));
 
     bool ret = FALSE;
     PROXY_CONFIG* proxy = new PROXY_CONFIG;
@@ -414,7 +414,7 @@ bool CSocksMgr::Begin( int port )
             break;
         }
 
-        infoLog(_T("Listening %d"),port);
+        infoLog(_T("[Svr] Listening %d"),port);
 
         sockaddr_in raddr;
 
@@ -429,7 +429,7 @@ bool CSocksMgr::Begin( int port )
                 break;
             }
 
-            infoLog(_T("Accept : %s"),a2t(inet_ntoa(raddr.sin_addr)));
+            infoLog(_T("[Svr] Accept : %s"),a2t(inet_ntoa(raddr.sin_addr)));
             
             Thread t;
 

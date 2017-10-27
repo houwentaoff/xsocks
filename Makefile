@@ -1,5 +1,5 @@
-#CC = arm-linux-g++
-CC = g++ -fpermissive
+CC = arm-linux-g++ -fpermissive
+#CC = g++ -fpermissive
 SRCS := $(wildcard ./src/*.cpp ./src/socks/*.cpp ./src/utils/*.cpp ./src/thread/*.cpp ./src/th3rd/*.cpp ./src/client/*.cpp)
 OBJS := $(patsubst %cpp,%o,$(SRCS))
 DEBUG :=

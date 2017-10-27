@@ -63,10 +63,21 @@ void * clientmain(void *pa)
 {
     int port = (int)pa;
     sleep(2);
+    printf("udp port:8000\n");
     SocksClint socks = SocksClint();
-    socks.Begin("127.0.0.1", port);
+    socks.Begin("127.0.0.1", port, 8000);
+    printf("udp port:8001\n");
+    SocksClint socks2 = SocksClint();
+    socks2.Begin("127.0.0.1", port, 8001);
     
     return NULL;
+}
+static void signal_stop(int signo)
+{
+//	kill(0, signo);
+	//delete_pid_file(LORAWAN_GATEWAY_PROC);
+	printf("Exit gatewway and stop its  process!\n");
+	exit(1);
 }
 
 #ifdef LINUX
@@ -85,6 +96,10 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	CMD_MAP cmd;
 
+    signal(SIGINT, signal_stop);
+	signal(SIGQUIT, signal_stop);
+	signal(SIGTERM, signal_stop);
+	
 	LoadCommand(argc,argv,cmd);
 	bool ret = FALSE;
 
